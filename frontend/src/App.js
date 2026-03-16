@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import "./index.css";
+import Leaderboard from "./pages/Leaderboard";
 
 function App() {
   const [search, setSearch] = useState("");
@@ -15,9 +17,16 @@ function App() {
   }, []);
 
   const loadQuestions = async () => {
-    const res = await axios.get("http://localhost:8080/questions");
-    setQuestions(res.data);
+    try {
+      const res = await axios.get("http://localhost:8080/questions");
+      setQuestions(res.data);
+    } catch (err) {
+      console.error("Error loading questions:", err);
+    }
   };
+
+  // Normalize text (remove ? and lowercase)
+  const normalize = (text) => text.toLowerCase().replace(/\?/g, "").trim();
 
   const handleChange = (e) => {
     const value = e.target.value;
@@ -28,48 +37,58 @@ function App() {
       return;
     }
 
+    const normalizedSearch = normalize(value);
+
     const filtered = questions.filter((q) =>
-      q.questionText.toLowerCase().includes(value.toLowerCase())
+      normalize(q.questionText).includes(normalizedSearch)
     );
 
-    setSuggestions(filtered);
+    const unique = [];
+    const seen = new Set();
+
+    filtered.forEach((q) => {
+      const normalizedQuestion = normalize(q.questionText);
+      if (!seen.has(normalizedQuestion)) {
+        seen.add(normalizedQuestion);
+        unique.push(q);
+      }
+    });
+
+    setSuggestions(unique.slice(0, 5));
   };
 
   const searchQuestion = async (text = search) => {
     if (!text.trim()) return;
 
-    // Clear suggestions immediately
     setSuggestions([]);
 
-    // Find existing question
+    const normalizedSearch = normalize(text);
+
     const found = questions.find(
-      (q) => q.questionText.toLowerCase() === text.toLowerCase()
+      (q) => normalize(q.questionText) === normalizedSearch
     );
 
     if (found) {
       setQuestion(found);
-
       const ans = await axios.get("http://localhost:8080/answers/" + found.id);
       setAnswers(ans.data);
     } else {
       const newQ = await axios.post("http://localhost:8080/questions", {
         questionText: text,
       });
-
       setQuestion(newQ.data);
       setAnswers([]);
-      loadQuestions(); // refresh questions list
+      loadQuestions();
     }
 
-    // AI Answer
     const ai = await axios.post("http://localhost:8080/ai", { question: text });
     setAiAnswer(ai.data);
+    setSearch("");
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      searchQuestion();
-    }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    searchQuestion();
   };
 
   const submitAnswer = async () => {
@@ -101,136 +120,111 @@ function App() {
   };
 
   return (
-    <div style={{ textAlign: "center", marginTop: "50px" }}>
-      <h1>Knowvia</h1>
-      <h3>AI Powered Student Doubt Exchange</h3>
-
-      <input
-        type="text"
-        placeholder="Enter your doubt"
-        value={search}
-        onChange={handleChange}
-        onKeyDown={handleKeyPress}
-        style={{ padding: "8px", width: "300px" }}
-      />
-
-      <button
-        onClick={() => searchQuestion()}
-        style={{ marginLeft: "10px", padding: "8px 15px" }}
-      >
-        Search
-      </button>
-
-      {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <div
-          style={{
-            width: "300px",
-            margin: "auto",
-            border: "1px solid #ccc",
-            textAlign: "left",
-          }}
-        >
-          {suggestions.map((q) => (
-            <div
-              key={q.id}
-              style={{ padding: "8px", cursor: "pointer" }}
-              onClick={() => {
-                setSearch(q.questionText);
-                searchQuestion(q.questionText);
-                setSuggestions([]); // ensure suggestions cleared
-              }}
-            >
-              {q.questionText}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Question & Answers */}
-      {question && (
-        <div
-          style={{
-            marginTop: "40px",
-            width: "500px",
-            marginLeft: "auto",
-            marginRight: "auto",
-            border: "1px solid #ddd",
-            padding: "20px",
-            textAlign: "left",
-          }}
-        >
-          <h2>{question.questionText}</h2>
-
-          {aiAnswer && (
-            <div
-              style={{
-                border: "2px solid green",
-                padding: "15px",
-                marginTop: "20px",
-                borderRadius: "6px",
-                backgroundColor: "#f3fff3",
-              }}
-            >
-              <h3>🤖 AI Answer</h3>
-              <p>{aiAnswer}</p>
-            </div>
-          )}
-
-          <h3>Student Answers</h3>
-
-          {answers.map((a) => (
-            <div
-              key={a.id}
-              style={{
-                border: "1px solid #ccc",
-                padding: "15px",
-                marginTop: "10px",
-                borderRadius: "5px",
-              }}
-            >
-              <p>{a.answerText}</p>
-
-              <span
-                style={{ cursor: "pointer", marginRight: "15px" }}
-                onClick={() => likeAnswer(a.id)}
-              >
-                👍 {a.likes}
-              </span>
-
-              <span
-                style={{ cursor: "pointer", marginRight: "15px" }}
-                onClick={() => dislikeAnswer(a.id)}
-              >
-                👎 {a.dislikes}
-              </span>
-
-              {a.bestAnswer && (
-                <span style={{ color: "green", fontWeight: "bold" }}>
-                  ⭐ Best Answer
-                </span>
-              )}
-
-              {!a.bestAnswer && (
-                <button style={{ marginLeft: "15px" }} onClick={() => bestAnswer(a.id)}>
-                  Mark Best
-                </button>
-              )}
-            </div>
-          ))}
-
-          <div style={{ marginTop: "20px" }}>
-            <input
-              type="text"
-              placeholder="Write your answer"
-              value={answerText}
-              onChange={(e) => setAnswerText(e.target.value)}
-              style={{ width: "70%", padding: "6px" }}
-            />
-            <button onClick={submitAnswer} style={{ marginLeft: "10px" }}>
-              Submit Answer
-            </button>
+    <div className="app-container">
+      {/* SIDEBAR: History + Leaderboard */}
+      <div className="sidebar">
+        <h3>History</h3>
+        {[...questions].reverse().map((q) => (
+          <div
+            key={q.id}
+            className="history-item"
+            onClick={() => {
+              setSearch(q.questionText);
+              searchQuestion(q.questionText);
+            }}
+          >
+            {q.questionText}
           </div>
+        ))}
+
+        {/* Leaderboard Component */}
+        <Leaderboard />
+      </div>
+
+      {/* MAIN CONTENT */}
+      <div className="main-content">
+        <h1>Knowvia</h1>
+        <h3>AI Powered Student Doubt Exchange</h3>
+
+        <form className="search-box" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Enter your doubt"
+            value={search}
+            onChange={handleChange}
+          />
+          <button type="submit">Search</button>
+        </form>
+
+        {/* Suggestions */}
+        {suggestions.length > 0 && (
+          <div className="suggestions">
+            {suggestions.map((q) => (
+              <div
+                key={q.id}
+                className="suggestion-item"
+                onClick={() => {
+                  setSearch(q.questionText);
+                  searchQuestion(q.questionText);
+                }}
+              >
+                {q.questionText}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Question + Answers */}
+        {question && (
+          <div className="qa-box">
+            <h2>{question.questionText}</h2>
+
+            {aiAnswer && (
+              <div className="ai-answer">
+                <h3>🤖 AI Answer</h3>
+                <p>{aiAnswer}</p>
+              </div>
+            )}
+
+            <h3>Student Answers</h3>
+
+            {answers.length === 0 ? (
+              <p style={{ color: "gray" }}>
+                No student answers yet. Be the first to answer!
+              </p>
+            ) : (
+              answers
+                .sort((a, b) => {
+                  if (a.bestAnswer && !b.bestAnswer) return -1;
+                  if (!a.bestAnswer && b.bestAnswer) return 1;
+                  return b.likes - a.likes;
+                })
+                .map((a) => (
+                  <div key={a.id} className="answer-card">
+                    <p>{a.answerText}</p>
+                    <span onClick={() => likeAnswer(a.id)}>👍 {a.likes}</span>
+                    <span onClick={() => dislikeAnswer(a.id)}>👎 {a.dislikes}</span>
+                    {a.bestAnswer && <span className="best">⭐ Best Answer</span>}
+                    {!a.bestAnswer && (
+                      <button onClick={() => bestAnswer(a.id)}>Mark Best</button>
+                    )}
+                  </div>
+                ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ANSWER BOX */}
+      {question && (
+        <div className="answer-box">
+          <input
+            type="text"
+            placeholder="Write your answer..."
+            value={answerText}
+            onChange={(e) => setAnswerText(e.target.value)}
+          />
+          <button onClick={submitAnswer}>Post Answer</button>
         </div>
       )}
     </div>
