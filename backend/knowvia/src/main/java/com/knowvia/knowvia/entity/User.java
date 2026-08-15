@@ -1,9 +1,10 @@
 package com.knowvia.knowvia.entity;
 
 import jakarta.persistence.*;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
+@Table(name = "users")
 public class User {
 
     @Id
@@ -15,7 +16,7 @@ public class User {
     @Column(unique = true)
     private String email;
 
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     private int points = 0;

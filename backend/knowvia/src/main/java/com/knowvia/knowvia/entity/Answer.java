@@ -9,8 +9,6 @@ public class Answer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long questionId;
-
     private String answerText;
 
     private int likes = 0;
@@ -19,18 +17,36 @@ public class Answer {
 
     private boolean bestAnswer = false;
 
+    // 🔥 LINK TO QUESTION
+    @ManyToOne
+    @JoinColumn(name = "question_id")
+    private Question question;
+
+    // 🔥 LINK TO USER
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
     public Answer() {}
 
     public Long getId() {
         return id;
     }
 
-    public Long getQuestionId() {
-        return questionId;
+    public Question getQuestion() {
+        return question;
     }
 
-    public void setQuestionId(Long questionId) {
-        this.questionId = questionId;
+    public void setQuestion(Question question) {
+        this.question = question;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public String getAnswerText() {

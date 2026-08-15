@@ -20,6 +20,6 @@ public class AnswerService {
     }
 
     public List<Answer> getAnswersByQuestion(Long questionId) {
-        return answerRepository.findByQuestionId(questionId);
+        return answerRepository.findByQuestion_Id(questionId);
     }
 }
